@@ -14,7 +14,8 @@ from datetime import date, timedelta
 from openai import OpenAI
 
 from leave_tracker.config import GROQ_API_KEY, LEAVE_TYPES, LLM_BASE_URL, LLM_MODEL
-from leave_tracker.models import Holiday
+from leave_tracker.models import Holiday, Organization
+from leave_tracker.policy import lookup as policy_lookup
 from leave_tracker.service import LeaveService, PermissionDenied, fmt
 
 MAX_TOOL_ROUNDS = 6
@@ -59,6 +60,9 @@ TOOLS = [
                               "the user must confirm.",
           {"leave_id": {"type": "integer"}, "approve": {"type": "boolean"}, "note": {"type": "string"}},
           ["leave_id", "approve"]),
+    _tool("policy_lookup", "Search the user's company leave policy (notice periods, carry-forward, sick notes, "
+                           "approval rules). Answer policy questions only from what it returns.",
+          {"question": {"type": "string"}}, ["question"]),
     _tool("confirm_pending_action", "Execute the proposed action. Works only if the user's latest message clearly says yes."),
 ]
 
@@ -67,7 +71,7 @@ class LeaveAgent:
     def __init__(self, service: LeaveService, client: OpenAI | None = None, model: str = LLM_MODEL):
         self.svc = service
         self.model = model
-        self.client = client or OpenAI(api_key=GROQ_API_KEY, base_url=LLM_BASE_URL,
+        self.client = client or OpenAI(api_key=GROQ_API_KEY, base_url=LLM_BASE_URL, max_retries=6,
                                        default_headers={"User-Agent": "leave-tracker-agent"})
         self.pending: dict | None = None             # the one proposed write action awaiting confirmation
         self.last_user_message = ""
@@ -80,9 +84,16 @@ class LeaveAgent:
                              for i in range(0, 21))
         holidays = self.svc.db.query(Holiday).filter(Holiday.org_id == u.org_id, Holiday.day >= today).all()
         role = {"PM": "Project Manager", "DEV": "Developer", "BA": "Business Analyst"}[u.role]
+        monday = today - timedelta(days=today.weekday())
+        weeks = (f"This week: {fmt(monday)} to {fmt(monday + timedelta(days=6))}. "
+                 f"Next week: {fmt(monday + timedelta(days=7))} to {fmt(monday + timedelta(days=13))}. "
+                 f"Week after: {fmt(monday + timedelta(days=14))} to {fmt(monday + timedelta(days=20))}.")
+        if today.weekday() >= 5:
+            weeks += " Today is a weekend, so 'this coming week' means next week."
         acting = " The PM is away today, so you are ACTING PM and may approve requests." if self.svc.is_acting_pm() else ""
         return f"""You are the leave assistant for {u.name}, a {role} on project "{u.project.name}".{acting}
-Today is {today.strftime('%A')} {today.isoformat()}. Next 3 weeks: {calendar}.
+Today is {fmt(today)} ({today.isoformat()}). Next 3 weeks: {calendar}.
+{weeks}
 Company holidays ahead: {', '.join(f'{h.name} {h.day.isoformat()}' for h in holidays) or 'none'}.
 Leave types: {', '.join(LEAVE_TYPES)}. Weekends and holidays are not counted as leave days.
 
@@ -95,6 +106,9 @@ To APPLY for leave, follow these steps in order, one question at a time:
 4. Ask for the reason.
 5. Call propose_leave and show a one-line summary (type, dates, working days, reason) and ask "Shall I submit it?".
 6. Only when the user replies yes, call confirm_pending_action.
+
+For policy questions (notice, carry-forward, sick notes, who approves), call policy_lookup and answer only from the
+returned sections, naming the section, e.g. (Policy: Sick leave).
 
 Rules: use tools for every fact about leave; never guess balances, dates or names. You can only act for {u.name};
 you cannot book or cancel leave for anyone else, and you cannot see other projects or companies.
@@ -111,8 +125,10 @@ Keep replies short and friendly. Copy dates and weekdays exactly as the tools re
                 m = s.find_member(args["name"])
                 return {"name": m.name, "balance": s.balance(m)}
             if name == "who_is_on_leave":
-                rows = s.who_is_on_leave(_date(args["start_date"]), _date(args["end_date"]))
-                return {"leaves": [{**r, "start": fmt(r["start"]), "end": fmt(r["end"])} for r in rows]}
+                start, end = _date(args["start_date"]), _date(args["end_date"])
+                rows = s.who_is_on_leave(start, end)
+                return {"period": f"{fmt(start)} to {fmt(end)}",
+                        "leaves": [{**r, "start": fmt(r["start"]), "end": fmt(r["end"])} for r in rows]}
             if name == "team_usage":
                 return {"team": s.team_usage(args.get("year"))}
             if name == "check_leave":
@@ -158,6 +174,10 @@ Keep replies short and friendly. Copy dates and weekdays exactly as the tools re
                                 "note": args.get("note", ""), "summary": f"{lv.user.name}: {lv.leave_type} "
                                 f"{fmt(lv.start_date)} to {fmt(lv.end_date)}"}
                 return {"ok": True, "awaiting_user_confirmation": True, "request": self.pending["summary"]}
+            if name == "policy_lookup":
+                code = s.db.get(Organization, s.org_id).code
+                hits = policy_lookup(code, args["question"])
+                return {"sections": hits} if hits else {"result": "Not covered by the policy; suggest contacting HR."}
             if name == "confirm_pending_action":
                 if not YES.match(self.last_user_message):
                     return {"ok": False, "problem": "The user has not said yes. Ask them to confirm first."}
@@ -167,6 +187,21 @@ Keep replies short and friendly. Copy dates and weekdays exactly as the tools re
             return {"ok": False, "permission_denied": str(e)}
         except (KeyError, ValueError) as e:
             return {"ok": False, "error": f"Bad arguments: {e}"}
+
+    def pending_summary(self) -> str | None:
+        """Human-readable description of the action waiting for confirmation (shown next to the Confirm button)."""
+        p = self.pending
+        if p is None:
+            return None
+        if p["action"] == "book":
+            return (f"Book {p['leave_type']} leave {fmt(p['start'])} to {fmt(p['end'])} "
+                    f"({p['days']} working day{'s' if p['days'] != 1 else ''}): {p['reason']}")
+        if p["action"] == "cancel":
+            return f"Cancel {p['summary']}"
+        return f"{'Approve' if p['approve'] else 'Reject'} {p['summary']}"
+
+    def discard(self) -> None:
+        self.pending = None
 
     def confirm(self) -> dict:
         """Execute the pending action. Called by confirm_pending_action or directly by the UI's Confirm button."""

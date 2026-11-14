@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Away · Team Leave</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2324406b'/><text x='16' y='23' font-size='19' text-anchor='middle' fill='%23f4efe6' font-family='Georgia' font-weight='700'>A</text></svg>">
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<section id="login" class="login" hidden>
+  <div class="login-hero">
+    <div class="brand-xl">Away<span>.</span></div>
+    <p class="tagline">Team leave, handled by an assistant that knows the rules&nbsp;&mdash; clashes, cover and approvals included.</p>
+    <div class="stub">
+      <div class="stub-head">Demo credentials</div>
+      <div class="stub-row"><span>Acme Technologies</span><code>ACME01 · acme@2026</code></div>
+      <div class="stub-row"><span>Nimbus Labs</span><code>NIMB02 · nimbus@2026</code></div>
+      <div class="stub-row"><span>Any employee</span><code>firstname@acme.test · Welcome@123</code></div>
+      <div class="stub-row"><span>Try</span><code>anita (PM) · kiran (Dev) · meera (BA)</code></div>
+    </div>
+  </div>
+
+  <div class="pass">
+    <div class="pass-top">
+      <span class="pass-label">Boarding pass</span>
+      <span class="pass-steps"><b id="step1-dot" class="on">01 Company</b><i></i><b id="step2-dot">02 You</b></span>
+    </div>
+    <form id="org-form" class="pass-body" autocomplete="off">
+      <label>Company code<input name="code" required placeholder="ACME01" autocapitalize="characters"></label>
+      <label>Company password<input name="password" type="password" required></label>
+      <button class="btn ink" type="submit">Continue →</button>
+    </form>
+    <form id="user-form" class="pass-body" hidden>
+      <div class="org-chosen" id="org-chosen"></div>
+      <label>Work email<input name="email" type="email" required placeholder="kiran@acme.test"></label>
+      <label>Password<input name="password" type="password" required></label>
+      <div class="row-btns">
+        <button class="btn ghost" type="button" id="back-org">← Back</button>
+        <button class="btn ink" type="submit">Sign in</button>
+      </div>
+    </form>
+    <div class="pass-perf"></div>
+    <div class="pass-foot"><span>GATE</span><b>LEAVE</b><span>SEAT</span><b id="seat">—</b></div>
+    <p class="form-error" id="login-error" role="alert"></p>
+  </div>
+</section>
+
+<!-- ============ APP ============ -->
+<section id="app" class="app" hidden>
+  <header class="topbar">
+    <div class="brand">Away<span>.</span></div>
+    <div class="who">
+      <span id="org-name" class="org"></span>
+      <span class="sep">/</span>
+      <span id="project-name" class="proj"></span>
+    </div>
+    <div class="top-right">
+      <span id="acting" class="acting" hidden>Acting PM</span>
+      <span id="role-stamp" class="role-stamp"></span>
+      <span id="today" class="mono today"></span>
+      <button id="bell" class="icon-btn" aria-label="Notifications">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 3a6 6 0 0 0-6 6v3.6L4.3 16h15.4L18 12.6V9a6 6 0 0 0-6-6zm0 18a2.5 2.5 0 0 0 2.4-2h-4.8A2.5 2.5 0 0 0 12 21z" fill="currentColor"/></svg>
+        <i id="bell-count" hidden></i>
+      </button>
+      <span id="user-name" class="user-name"></span>
+      <button id="logout" class="btn ghost small">Sign out</button>
+    </div>
+    <div id="notif-panel" class="notif-panel" hidden></div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button data-tab="chat" class="on">Assistant</button>
+    <button data-tab="cal">Calendar</button>
+    <button data-tab="board">Team</button>
+  </nav>
+
+  <main class="grid">
+    <!-- assistant -->
+    <section class="panel chat" data-pane="chat">
+      <div class="panel-head"><h2>Assistant</h2><span class="hint">Ask, apply, approve</span></div>
+      <div id="messages" class="messages" aria-live="polite"></div>
+      <div id="pending" class="pending" hidden>
+        <div class="pending-label">Waiting for your confirmation</div>
+        <div id="pending-text" class="pending-text"></div>
+        <div class="row-btns">
+          <button class="btn ghost small" id="discard">Discard</button>
+          <button class="btn stamp" id="confirm">Confirm</button>
+        </div>
+      </div>
+      <div class="chips" id="chips"></div>
+      <form id="chat-form" class="composer">
+        <input id="chat-input" placeholder="e.g. I want 2 days of casual leave from the 2nd" autocomplete="off" maxlength="1000">
+        <button class="btn ink" type="submit" id="send">Send</button>
+      </form>
+    </section>
+
+    <!-- calendar -->
+    <section class="panel cal" data-pane="cal">
+      <div class="panel-head">
+        <h2 id="month-title">Calendar</h2>
+        <div class="month-nav">
+          <button class="icon-btn" id="prev-month" aria-label="Previous month">‹</button>
+          <button class="icon-btn" id="next-month" aria-label="Next month">›</button>
+        </div>
+      </div>
+      <div class="legend">
+        <span><i class="lg lg-approved"></i>Approved</span><span><i class="lg lg-pending"></i>Pending</span>
+        <span><i class="lg lg-blocked"></i>Blocked for you</span><span><i class="lg lg-hol"></i>Holiday</span>
+      </div>
+      <div class="dow"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
+      <div id="cal-grid" class="cal-grid"></div>
+
+      <div class="apply">
+        <div class="apply-head">Apply for leave <span class="hint" id="range-label">Pick a start and an end day</span></div>
+        <div class="types" id="types"></div>
+        <div id="check-line" class="check-line"></div>
+        <form id="apply-form" class="apply-row">
+          <input id="reason" placeholder="Reason (required)" maxlength="300">
+          <button class="btn ink" id="apply-btn" type="submit" disabled>Request</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- team board -->
+    <section class="panel board" data-pane="board">
+      <div class="panel-head"><h2>Team board</h2><span class="hint" id="board-hint">Next 3 weeks</span></div>
+      <div class="balances" id="balances"></div>
+      <div class="block">
+        <h3>Timeline</h3>
+        <div id="timeline" class="timeline"></div>
+      </div>
+      <div class="block" id="capacity-block" hidden>
+        <h3>Capacity warnings</h3>
+        <div id="capacity"></div>
+      </div>
+      <div class="block" id="approvals-block" hidden>
+        <h3>Waiting for you <span id="approvals-count" class="count"></span></h3>
+        <div id="approvals"></div>
+      </div>
+      <div class="block" id="usage-block" hidden>
+        <h3>Leave used this year</h3>
+        <div id="usage"></div>
+      </div>
+      <div class="block">
+        <h3>My leave</h3>
+        <div id="my-leaves"></div>
+      </div>
+    </section>
+  </main>
+</section>
+
+<!-- cover notice modal (BA) -->
+<dialog id="cover-modal" class="notice">
+  <div class="notice-tape">Cover notice</div>
+  <h3 id="cover-title"></h3>
+  <p id="cover-text"></p>
+  <ul class="notice-list">
+    <li>Leave requests from your team are routed to you.</li>
+    <li>You can approve or reject them from the Team board or the assistant.</li>
+  </ul>
+  <button class="btn stamp" id="cover-ack">Acknowledge</button>
+</dialog>
+
+<div id="toasts" class="toasts" aria-live="polite"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

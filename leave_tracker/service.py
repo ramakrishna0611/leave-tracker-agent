@@ -51,6 +51,10 @@ def fmt(d: date) -> str:
     return d.strftime("%a %d %b %Y")
 
 
+def span(start: date, end: date) -> str:
+    return fmt(start) if start == end else f"{fmt(start)} to {fmt(end)}"
+
+
 class LeaveService:
     def __init__(self, db: Session, user: User, today: date | None = None):
         self.db = db
@@ -291,7 +295,7 @@ class LeaveService:
                                             ba_id=ba.id, leave_request_id=lv.id, start_date=start, end_date=end))
                 self._notify(ba.id, "cover", f"{self.user.name} (PM) is on leave {fmt(start)} to {fmt(end)}. "
                                              f"You are the acting PM for these days.")
-            message = f"Leave approved: {check.days} working day(s), {fmt(start)} to {fmt(end)}." + \
+            message = f"Leave approved: {check.days} working day(s), {span(start, end)}." + \
                       (f" {ba.name} (BA) has been asked to cover." if ba else "")
         else:
             approver = self._approver_for(self.user)
@@ -299,7 +303,7 @@ class LeaveService:
                 self._notify(approver.id, "approval_needed",
                              f"{self.user.name} requested {check.days} day(s) of {leave_type} leave, "
                              f"{fmt(start)} to {fmt(end)}: {lv.reason}")
-            message = (f"Leave requested: {check.days} working day(s), {fmt(start)} to {fmt(end)}. "
+            message = (f"Leave requested: {check.days} working day(s), {span(start, end)}. "
                        f"Waiting for approval from {approver.name if approver else 'your manager'}.")
         self._audit("leave_requested", leave_id=lv.id, type=leave_type, start=start, end=end,
                     days=check.days, status=lv.status)
@@ -346,7 +350,7 @@ class LeaveService:
                                                    f"{fmt(lv.end_date)}. You no longer need to cover.")
         self._audit("leave_cancelled", leave_id=lv.id)
         self.db.commit()
-        return RequestResult(ok=True, leave=lv, message=f"Cancelled leave {fmt(lv.start_date)} to {fmt(lv.end_date)}.")
+        return RequestResult(ok=True, leave=lv, message=f"Cancelled leave {span(lv.start_date, lv.end_date)}.")
 
     # ---------- notifications ----------
     def notifications(self, unread_only: bool = True) -> list[Notification]:
