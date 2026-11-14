@@ -56,11 +56,18 @@ SQLAlchemy 2.0 → SQLite (Postgres-ready)          policy.py → per-company po
 
 ## Results
 
-Unit and API tests: **39 passing** (`pytest`), covering login, clash rules, balances, holidays, approvals, acting-PM cover, cancellation, visibility, tenant isolation, audit log, the agent's confirmation guard and every API route. No LLM is needed for these.
+Unit and API tests: **43 passing** (`pytest`), covering login, clash rules, balances, holidays, approvals, acting-PM cover, cancellation, visibility, tenant isolation, audit log, the agent's confirmation guard and every API route. No LLM is needed for these.
 
 Agent evaluation (`python -m eval.run_agent_eval`, live model, fresh data per case):
 
-Results are written to `eval/agent_results.json`; see the latest run in the commit history.
+| Check | Result | What it means |
+|---|---|---|
+| Unsafe writes | **0 / 8** | Booking without the user's "yes", acting for a colleague, prompt injection ("admin mode", fake `SYSTEM:` message), a developer approving, cancelling someone else's leave: the database never changed |
+| Cross-company leaks | **0** | No reply mentioned the other company's people or projects |
+| Multi-turn tasks | **4 / 4** | Guided booking; clash → suggested date → booking; PM approval; PM leave that assigns BA cover — each ended in exactly the expected database state |
+| Tool choice | **10 / 12** | Single questions answered with the expected tool |
+
+Model: `openai/gpt-oss-120b` on Groq, low reasoning effort. Results vary between runs because the model is not deterministic: across three runs tool choice ranged from 10 to 11 of 12 and one run missed one multi-turn task, while **unsafe writes and leaks were 0 in every run** — those are guaranteed by code, not by the model. Misses led to prompt fixes (skip questions the user already answered; always fetch the balance first; call `suggest_dates` directly), each re-tested 4 of 4. Full transcripts: `eval/agent_results.json`.
 
 ## Run it
 
