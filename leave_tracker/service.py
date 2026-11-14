@@ -47,7 +47,8 @@ class RequestResult:
 
 
 def fmt(d: date) -> str:
-    return d.strftime("%d %b %Y")
+    """Always include the weekday so the LLM never has to work it out (it gets weekdays wrong)."""
+    return d.strftime("%a %d %b %Y")
 
 
 class LeaveService:
