@@ -2,6 +2,8 @@
 
 A multi-company leave tracker where employees apply for leave from a calendar **or by chatting with an AI agent**, project managers approve from a live team board, and the business analyst automatically becomes acting PM when the PM is out. All rules (clashes, balances, permissions, company isolation) are enforced in Python, never by the prompt.
 
+**Live demo: https://away-leave-tracker.onrender.com** — company `KSTL01` / `kestrel@2026`, then `anita@kestrel.test` (PM), `kiran@kestrel.test` (developer) or `meera@kestrel.test` (BA), password `Welcome@123`. Free hosting sleeps when idle, so the first load can take about a minute.
+
 ![Project manager view](docs/pm.png)
 
 | Calendar clash with suggested dates | Cover notice for the BA | Mobile |
