@@ -52,16 +52,16 @@ def test_requires_login(client):
 
 
 def test_user_step_needs_company_step(client):
-    r = client.post("/api/login/user", json={"email": "kiran@acme.test", "password": "Welcome@123"})
+    r = client.post("/api/login/user", json={"email": "kiran@kestrel.test", "password": "Welcome@123"})
     assert r.status_code == 401
 
 
 def test_wrong_company_password(client):
-    assert client.post("/api/login/org", json={"code": "ACME01", "password": "nope"}).status_code == 401
+    assert client.post("/api/login/org", json={"code": "KSTL01", "password": "nope"}).status_code == 401
 
 
 def test_me_and_calendar(client):
-    login(client, "ACME01", "acme@2026", "kiran@acme.test")
+    login(client, "KSTL01", "kestrel@2026", "kiran@kestrel.test")
     me = client.get("/api/me").json()
     assert me["role"] == "DEV" and me["project"] == "Phoenix CRM" and me["balance"]["casual"]["allowed"] == 12
     cal = client.get(f"/api/calendar?month={date.today():%Y-%m}").json()
@@ -69,14 +69,14 @@ def test_me_and_calendar(client):
 
 
 def test_apply_approve_flow(client):
-    login(client, "ACME01", "acme@2026", "kiran@acme.test")
+    login(client, "KSTL01", "kestrel@2026", "kiran@kestrel.test")
     day = free_day(client)
     r = client.post("/api/leaves", json={"leave_type": "casual", "start": day, "end": day, "reason": "Exam"})
     assert r.status_code == 200, r.text
     leave_id = r.json()["leave"]["id"]
     client.post("/api/logout")
 
-    login(client, "ACME01", "acme@2026", "anita@acme.test")
+    login(client, "KSTL01", "kestrel@2026", "anita@kestrel.test")
     assert leave_id in [a["id"] for a in client.get("/api/approvals").json()]
     assert client.post(f"/api/approvals/{leave_id}", json={"approve": True}).status_code == 200
     board = client.get("/api/dashboard").json()
@@ -84,34 +84,34 @@ def test_apply_approve_flow(client):
 
 
 def test_developer_cannot_approve_and_has_no_usage(client):
-    login(client, "ACME01", "acme@2026", "kiran@acme.test")
+    login(client, "KSTL01", "kestrel@2026", "kiran@kestrel.test")
     day = free_day(client)
     leave_id = client.post("/api/leaves", json={"leave_type": "casual", "start": day, "end": day,
                                                 "reason": "Exam"}).json()["leave"]["id"]
     client.post("/api/logout")
-    login(client, "ACME01", "acme@2026", "ravi@acme.test")
+    login(client, "KSTL01", "kestrel@2026", "ravi@kestrel.test")
     assert client.post(f"/api/approvals/{leave_id}", json={"approve": True}).status_code == 403
     assert "usage" not in client.get("/api/dashboard").json()
 
 
 def test_other_company_cannot_touch_leave(client):
-    login(client, "ACME01", "acme@2026", "kiran@acme.test")
+    login(client, "KSTL01", "kestrel@2026", "kiran@kestrel.test")
     day = free_day(client)
     leave_id = client.post("/api/leaves", json={"leave_type": "casual", "start": day, "end": day,
                                                 "reason": "Exam"}).json()["leave"]["id"]
     client.post("/api/logout")
-    login(client, "NIMB02", "nimbus@2026", "sara@nimbus.test")          # PM at the other company
+    login(client, "SAFR02", "saffron@2026", "sara@saffron.test")          # PM at the other company
     assert client.post(f"/api/approvals/{leave_id}", json={"approve": True}).status_code == 403
     assert client.post(f"/api/leaves/{leave_id}/cancel").status_code == 403
 
 
 def test_pm_leave_creates_cover_notice_for_ba(client):
-    login(client, "ACME01", "acme@2026", "anita@acme.test")
+    login(client, "KSTL01", "kestrel@2026", "anita@kestrel.test")
     day = free_day(client)
     assert client.post("/api/leaves", json={"leave_type": "earned", "start": day, "end": day,
                                             "reason": "Conference"}).status_code == 200
     client.post("/api/logout")
-    login(client, "ACME01", "acme@2026", "meera@acme.test")
+    login(client, "KSTL01", "kestrel@2026", "meera@kestrel.test")
     notices = client.get("/api/me").json()["cover_notices"]
     assert len(notices) == 1 and notices[0]["pm"] == "Anita Rao"
     assert client.post(f"/api/cover/{notices[0]['id']}/ack").status_code == 200

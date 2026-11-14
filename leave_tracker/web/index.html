@@ -8,20 +8,22 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,800&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/app.css">
+<script>try{var t=localStorage.getItem("away-theme");if(t)document.documentElement.dataset.theme=t;}catch(e){}</script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2324406b'/><text x='16' y='23' font-size='19' text-anchor='middle' fill='%23f4efe6' font-family='Georgia' font-weight='700'>A</text></svg>">
 </head>
 <body>
 
 <!-- ============ LOGIN ============ -->
 <section id="login" class="login" hidden>
+  <button class="icon-btn theme-btn login-theme" type="button" aria-label="Switch dark or light mode" title="Dark / light mode"><span class="sun">☀</span><span class="moon">☾</span></button>
   <div class="login-hero">
     <div class="brand-xl">Away<span>.</span></div>
     <p class="tagline">Team leave, handled by an assistant that knows the rules&nbsp;&mdash; clashes, cover and approvals included.</p>
     <div class="stub">
       <div class="stub-head">Demo credentials</div>
-      <div class="stub-row"><span>Acme Technologies</span><code>ACME01 · acme@2026</code></div>
-      <div class="stub-row"><span>Nimbus Labs</span><code>NIMB02 · nimbus@2026</code></div>
-      <div class="stub-row"><span>Any employee</span><code>firstname@acme.test · Welcome@123</code></div>
+      <div class="stub-row"><span>Kestrel Systems</span><code>KSTL01 · kestrel@2026</code></div>
+      <div class="stub-row"><span>Saffron Cloudworks</span><code>SAFR02 · saffron@2026</code></div>
+      <div class="stub-row"><span>Any employee</span><code>firstname@kestrel.test · Welcome@123</code></div>
       <div class="stub-row"><span>Try</span><code>anita (PM) · kiran (Dev) · meera (BA)</code></div>
     </div>
   </div>
@@ -32,13 +34,13 @@
       <span class="pass-steps"><b id="step1-dot" class="on">01 Company</b><i></i><b id="step2-dot">02 You</b></span>
     </div>
     <form id="org-form" class="pass-body" autocomplete="off">
-      <label>Company code<input name="code" required placeholder="ACME01" autocapitalize="characters"></label>
+      <label>Company code<input name="code" required placeholder="KSTL01" autocapitalize="characters"></label>
       <label>Company password<input name="password" type="password" required></label>
       <button class="btn ink" type="submit">Continue →</button>
     </form>
     <form id="user-form" class="pass-body" hidden>
       <div class="org-chosen" id="org-chosen"></div>
-      <label>Work email<input name="email" type="email" required placeholder="kiran@acme.test"></label>
+      <label>Work email<input name="email" type="email" required placeholder="kiran@kestrel.test"></label>
       <label>Password<input name="password" type="password" required></label>
       <div class="row-btns">
         <button class="btn ghost" type="button" id="back-org">← Back</button>
@@ -64,6 +66,7 @@
       <span id="acting" class="acting" hidden>Acting PM</span>
       <span id="role-stamp" class="role-stamp"></span>
       <span id="today" class="mono today"></span>
+      <button class="icon-btn theme-btn " type="button" aria-label="Switch dark or light mode" title="Dark / light mode"><span class="sun">☀</span><span class="moon">☾</span></button>
       <button id="bell" class="icon-btn" aria-label="Notifications">
         <svg viewBox="0 0 24 24" width="20" height="20"><path d="M12 3a6 6 0 0 0-6 6v3.6L4.3 16h15.4L18 12.6V9a6 6 0 0 0-6-6zm0 18a2.5 2.5 0 0 0 2.4-2h-4.8A2.5 2.5 0 0 0 12 21z" fill="currentColor"/></svg>
         <i id="bell-count" hidden></i>

@@ -1,4 +1,4 @@
-# Acme Technologies Leave Policy
+# Kestrel Systems Leave Policy
 
 ## Leave types and yearly allowance
 Every employee receives 12 casual days, 6 sick days and 10 earned days per calendar year. Allowances reset on 1 January. Only working days count: weekends and company holidays inside a leave period are not deducted.
@@ -22,7 +22,7 @@ Up to 5 unused earned days can be carried forward to the next year. Unused casua
 You can cancel pending or approved leave any time before it starts. Leave that has already started must be shortened through HR.
 
 ## Company holidays
-Acme observes Diwali, Christmas, New Year, Sankranti and Republic Day as company holidays. The full list is visible on the tracker calendar.
+Kestrel observes Diwali, Christmas, New Year, Sankranti and Republic Day as company holidays. The full list is visible on the tracker calendar.
 
 ## Contact
-Questions not covered here go to people@acme.test.
+Questions not covered here go to people@kestrel.test.

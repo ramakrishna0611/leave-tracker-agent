@@ -11,7 +11,7 @@ from leave_tracker.auth import hash_password
 from leave_tracker.models import Base, Holiday, LeaveRequest, Organization, Project, User, make_session_factory
 
 ORGS = [
-    {"name": "Acme Technologies", "code": "ACME01", "password": "acme@2026", "domain": "acme.test",
+    {"name": "Kestrel Systems", "code": "KSTL01", "password": "kestrel@2026", "domain": "kestrel.test",
      "projects": {
          "Phoenix CRM":     [("Anita Rao", "PM"), ("Ravi Kumar", "DEV"), ("Kiran Reddy", "DEV"), ("Meera Shah", "BA")],
          "Atlas Payments":  [("Vikram Singh", "PM"), ("Sneha Iyer", "DEV"), ("Arjun Nair", "DEV"), ("Pooja Das", "BA")],
@@ -19,7 +19,7 @@ ORGS = [
      },
      "holidays": [(date(2026, 11, 8), "Diwali"), (date(2026, 12, 25), "Christmas"), (date(2027, 1, 1), "New Year"),
                   (date(2027, 1, 14), "Sankranti"), (date(2027, 1, 26), "Republic Day")]},
-    {"name": "Nimbus Labs", "code": "NIMB02", "password": "nimbus@2026", "domain": "nimbus.test",
+    {"name": "Saffron Cloudworks", "code": "SAFR02", "password": "saffron@2026", "domain": "saffron.test",
      "projects": {
          "Helios App":   [("Sara Thomas", "PM"), ("Aditya Rao", "DEV"), ("Lakshmi Pillai", "DEV"), ("Omar Shaikh", "BA")],
          "Vega Data":    [("Rohan Gupta", "PM"), ("Isha Kapoor", "DEV"), ("Manoj Patil", "DEV"), ("Tanvi Kulkarni", "BA")],
@@ -63,11 +63,11 @@ def seed(db: Session, today: date | None = None) -> None:
         u = db.query(User).filter_by(email=email).one()
         db.add(LeaveRequest(org_id=u.org_id, user_id=u.id, leave_type=kind, start_date=start, end_date=end,
                             days=days, status=status, reason=reason))
-    leave("ravi@acme.test", "casual", mon + timedelta(days=7), mon + timedelta(days=9), 3, "APPROVED", "Family function")
-    leave("sneha@acme.test", "sick", mon, mon + timedelta(days=1), 2, "APPROVED", "Fever")
-    leave("arjun@acme.test", "earned", mon + timedelta(days=14), mon + timedelta(days=18), 5, "PENDING", "Vacation")
-    leave("rahul@acme.test", "casual", mon + timedelta(days=2), mon + timedelta(days=2), 1, "PENDING", "Bank work")
-    leave("aditya@nimbus.test", "casual", mon + timedelta(days=7), mon + timedelta(days=8), 2, "APPROVED", "Travel")
+    leave("ravi@kestrel.test", "casual", mon + timedelta(days=7), mon + timedelta(days=9), 3, "APPROVED", "Family function")
+    leave("sneha@kestrel.test", "sick", mon, mon + timedelta(days=1), 2, "APPROVED", "Fever")
+    leave("arjun@kestrel.test", "earned", mon + timedelta(days=14), mon + timedelta(days=18), 5, "PENDING", "Vacation")
+    leave("rahul@kestrel.test", "casual", mon + timedelta(days=2), mon + timedelta(days=2), 1, "PENDING", "Bank work")
+    leave("aditya@saffron.test", "casual", mon + timedelta(days=7), mon + timedelta(days=8), 2, "APPROVED", "Travel")
     db.commit()
 
 
@@ -79,8 +79,8 @@ def main() -> None:
     Session = make_session_factory(DB_URL)
     with Session() as db:
         seed(db)
-    print("Seeded 2 companies, 6 projects, 24 employees. Company passwords: ACME01 / acme@2026, "
-          f"NIMB02 / nimbus@2026; every employee: {USER_PASSWORD}")
+    print("Seeded 2 companies, 6 projects, 24 employees. Company passwords: KSTL01 / kestrel@2026, "
+          f"SAFR02 / saffron@2026; every employee: {USER_PASSWORD}")
 
 
 if __name__ == "__main__":

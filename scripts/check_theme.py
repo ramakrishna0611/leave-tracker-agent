@@ -1,0 +1,17 @@
+from playwright.sync_api import sync_playwright
+with sync_playwright() as p:
+    b = p.chromium.launch(channel="msedge"); page = b.new_page(viewport={"width": 1500, "height": 950}, color_scheme="light")
+    errs = []; page.on("pageerror", lambda e: errs.append(str(e)))
+    page.goto("http://127.0.0.1:8000"); page.wait_for_selector("#org-form"); page.wait_for_timeout(700)
+    page.click(".login-theme"); page.wait_for_timeout(500); page.screenshot(path="docs/login_dark.png")
+    page.fill("#org-form [name=code]", "KSTL01"); page.fill("#org-form [name=password]", "kestrel@2026"); page.click("#org-form button")
+    page.wait_for_selector("#user-form:not([hidden])")
+    page.fill("#user-form [name=email]", "anita@kestrel.test"); page.fill("#user-form [name=password]", "Welcome@123")
+    page.click("#user-form button[type=submit]"); page.wait_for_selector("#app:not([hidden])"); page.wait_for_timeout(1500)
+    print("theme after login:", page.evaluate("document.documentElement.dataset.theme"))
+    page.screenshot(path="docs/pm_dark.png", full_page=True)
+    page.reload(); page.wait_for_selector("#app:not([hidden])"); page.wait_for_timeout(800)
+    print("theme after reload (remembered):", page.evaluate("document.documentElement.dataset.theme"))
+    page.click("#app .theme-btn"); page.wait_for_timeout(400)
+    print("after toggle:", page.evaluate("document.documentElement.dataset.theme"), "errors:", errs)
+    b.close()

@@ -20,7 +20,7 @@ def db():
 
 @pytest.fixture()
 def svc(db):
-    """svc('ravi@acme.test') -> LeaveService logged in as that employee."""
+    """svc('ravi@kestrel.test') -> LeaveService logged in as that employee."""
     def make(email: str) -> LeaveService:
         user = db.scalar(select(User).where(User.email == email))
         return LeaveService(db, user, today=TODAY)

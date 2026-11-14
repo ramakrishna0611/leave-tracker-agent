@@ -446,6 +446,19 @@ async function cancelLeave(id) {
   } catch (err) { toast(err.message, true); }
 }
 
+// ---------- dark / light mode ----------
+function currentTheme() {
+  return document.documentElement.dataset.theme ||
+    (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+}
+$$(".theme-btn").forEach(btn => btn.addEventListener("click", () => {
+  const next = currentTheme() === "dark" ? "light" : "dark";
+  document.documentElement.dataset.theme = next;
+  try { localStorage.setItem("away-theme", next); } catch (e) { /* private mode: still switches */ }
+}));
+// Without a saved choice, follow the system setting so the sun/moon icon matches what is shown
+if (!document.documentElement.dataset.theme) document.documentElement.dataset.theme = currentTheme();
+
 // ---------- mobile tabs ----------
 function showTab(tab) {
   $$("#tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
