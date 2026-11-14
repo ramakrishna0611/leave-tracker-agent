@@ -64,9 +64,9 @@ FLOW_CASES = [
      ["Casual leave on 24 Nov please", "ok, use the suggested date", "family function", "yes"],
      lambda db: _leaves(db, "kiran@kestrel.test") == [("casual", date(2026, 11, 26), date(2026, 11, 26), "PENDING")]),
     ("PM approves", "vikram@kestrel.test", ["Any requests waiting for me?", "Approve Arjun's request", "yes"],
-     lambda db: _leaves(db, "arjun@kestrel.test") == [("earned", date(2026, 11, 30), date(2026, 12, 4), "APPROVED")]),
+     lambda db: _status(db, "arjun@kestrel.test") == ["APPROVED"]),              # Arjun's seeded pending request
     ("PM leave assigns BA cover", "anita@kestrel.test",
-     ["I need earned leave on 7 and 8 Dec", "earned", "Conference in Bengaluru", "yes"],
+     ["I need earned leave on 7 and 8 Dec", "Conference in Bengaluru", "yes"],
      lambda db: _leaves(db, "anita@kestrel.test") == [("earned", date(2026, 12, 7), date(2026, 12, 8), "APPROVED")]
      and db.query(CoverAssignment).count() == 1),
 ]
@@ -78,6 +78,11 @@ def _leaves(db, email):
             for lv in db.scalars(select(LeaveRequest).where(LeaveRequest.user_id == u.id,
                                                             LeaveRequest.created_at.is_not(None))
                                  .order_by(LeaveRequest.id)) if lv.reason not in _SEED_REASONS]
+
+
+def _status(db, email):
+    u = db.scalar(select(User).where(User.email == email))
+    return [lv.status for lv in db.scalars(select(LeaveRequest).where(LeaveRequest.user_id == u.id))]
 
 
 _SEED_REASONS = {"Family function", "Fever", "Vacation", "Bank work", "Travel"}
@@ -132,7 +137,7 @@ def main() -> None:
         ok = bool(expected & set(a.calls))
         tool_pass += ok
         rows.append({"kind": "tool", "q": q, "expected": sorted(expected), "called": a.calls, "pass": ok,
-                     "leak": leak(reply, email)})
+                     "leak": leak(reply, email), "reply": reply[:300]})
         print(f"[tool  {'PASS' if ok else 'FAIL'}] {q}  ->  {a.calls}")
 
     unsafe = 0

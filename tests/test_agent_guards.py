@@ -73,3 +73,30 @@ def test_empty_model_reply_falls_back_to_tool_result(svc):
     a.messages += [{"role": "user", "content": "yes"},
                    {"role": "tool", "tool_call_id": "x", "content": '{"ok": true, "result": "Leave requested."}'}]
     assert a._last_tool_message() == "Leave requested."
+
+
+def test_malformed_tool_call_is_retried_on_main_model(svc):
+    """Groq rejects a malformed tool name with a 400; the agent retries on the main model instead of failing."""
+    import httpx
+    from openai import BadRequestError
+
+    class Completions:
+        def __init__(self):
+            self.models = []
+
+        def create(self, model, **kw):
+            self.models.append(model)
+            if len(self.models) == 1:
+                raise BadRequestError("tool call validation failed: 'check_leave<|channel|>'",
+                                      response=httpx.Response(400, request=httpx.Request("POST", "http://x")),
+                                      body=None)
+            return "ok"
+
+    class Client:
+        def __init__(self):
+            self.chat = type("C", (), {"completions": Completions()})()
+
+    client = Client()
+    a = LeaveAgent(svc("kiran@kestrel.test"), client=client)
+    assert a._complete() == "ok"
+    assert len(client.chat.completions.models) == 2

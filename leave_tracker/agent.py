@@ -11,7 +11,7 @@ import json
 import re
 from datetime import date, timedelta
 
-from openai import OpenAI, RateLimitError
+from openai import BadRequestError, OpenAI, RateLimitError
 
 from leave_tracker.config import FALLBACK_MODEL, GROQ_API_KEY, LEAVE_TYPES, LLM_BASE_URL, LLM_MODEL
 from leave_tracker.models import Holiday, Organization
@@ -99,8 +99,9 @@ Today is {fmt(today)} ({today.isoformat()}). Next 3 weeks: {calendar}.
 Company holidays ahead: {', '.join(f'{h.name} {h.day.isoformat()}' for h in holidays) or 'none'}.
 Leave types: {', '.join(LEAVE_TYPES)}. Weekends and holidays are not counted as leave days.
 
-To APPLY for leave, follow these steps in order, one question at a time:
-1. Ask which leave type, showing the remaining balance of each (call get_my_balance).
+To APPLY for leave, follow these steps in order, one question at a time. If the user already gave some
+answers (for example "casual leave on 2 Dec"), skip those questions and go straight to the next step:
+1. Call get_my_balance first (always, before replying), then ask which leave type, showing what is left of each.
 2. Ask for the dates or number of days. Convert phrases like "next Friday" or "3 days from the 20th" to exact ISO dates.
 3. Call check_leave. If it is not ok, explain the problem plainly; if there is a clash, name the colleague and offer
    the suggested dates. A clash or low balance can never be overridden, so never offer to keep blocked dates.
@@ -109,6 +110,7 @@ To APPLY for leave, follow these steps in order, one question at a time:
 5. Call propose_leave and show a one-line summary (type, dates, working days, reason) and ask "Shall I submit it?".
 6. Only when the user replies yes, call confirm_pending_action.
 
+When the user asks for free or available dates, call suggest_dates right away (it needs no leave type).
 For policy questions (notice, carry-forward, sick notes, who approves), call policy_lookup and answer only from the
 returned sections, naming the section, e.g. (Policy: Sick leave).
 
@@ -244,14 +246,21 @@ Keep replies short and friendly. Copy dates and weekdays exactly as the tools re
         return "Done. Anything else?"
 
     def _complete(self):
-        """Call the main model; if it is rate-limited, retry once on the fallback model (separate quota)."""
+        """Call the main model. If it is rate-limited, use the fallback model (separate quota).
+        If a model emits a malformed tool call (Groq rejects it with a 400), retry on the main model."""
         kwargs = dict(messages=self._trimmed(), tools=TOOLS, temperature=0.2, timeout=60, reasoning_effort="low")
-        try:
-            return self.client.chat.completions.create(model=self.model, **kwargs)
-        except RateLimitError:
-            if not FALLBACK_MODEL or FALLBACK_MODEL == self.model:
-                raise
-            return self.client.chat.completions.create(model=FALLBACK_MODEL, **kwargs)
+        plan = [self.model] + ([FALLBACK_MODEL] if FALLBACK_MODEL and FALLBACK_MODEL != self.model else []) + [self.model]
+        last_error: Exception | None = None
+        for model in plan:
+            try:
+                return self.client.chat.completions.create(model=model, **kwargs)
+            except RateLimitError as e:
+                last_error = e
+            except BadRequestError as e:
+                if "tool call validation" not in str(e):
+                    raise
+                last_error = e
+        raise last_error
 
     def chat(self, user_message: str) -> str:
         self.last_user_message = user_message
