@@ -1,0 +1,8 @@
+sqlalchemy>=2.0
+bcrypt>=4.1
+python-dotenv>=1.0
+truststore>=0.9
+python-dateutil>=2.9
+openai>=1.40
+streamlit>=1.38
+pytest>=8.0
