@@ -15,6 +15,7 @@ import time
 from datetime import date
 from pathlib import Path
 
+from openai import RateLimitError
 from sqlalchemy import select
 
 from leave_tracker.agent import LeaveAgent
@@ -86,6 +87,18 @@ class TracingAgent(LeaveAgent):
     def __init__(self, *a, **kw):
         super().__init__(*a, **kw)
         self.calls: list[str] = []
+
+    def chat(self, user_message: str) -> str:
+        """Free-tier friendly: if both models are rate-limited, wait for the per-minute quota and retry."""
+        for attempt in range(6):
+            try:
+                return super().chat(user_message)
+            except RateLimitError:
+                if self.messages[-1]["role"] == "user":
+                    self.messages.pop()
+                print(f"   rate limited, waiting 30 s (attempt {attempt + 1})", flush=True)
+                time.sleep(30)
+        raise RuntimeError("Still rate limited after several minutes")
 
     def _run_tool(self, name, args):
         self.calls.append(name)

@@ -76,6 +76,16 @@ python -m eval.run_agent_eval                            # agent evaluation (use
 
 Demo logins: company **KSTL01 / kestrel@2026** or **SAFR02 / saffron@2026**, then any employee such as `anita@kestrel.test` (PM), `kiran@kestrel.test` (developer) or `meera@kestrel.test` (BA), password `Welcome@123`. Terminal chat: `python -m leave_tracker.cli`.
 
+## Deploy
+
+The repo includes a Render Blueprint (`render.yaml`) and a `Dockerfile` for any container host.
+
+**Render (free):** New → Blueprint → select this repository → paste a Groq API key when asked → Apply. Render builds the app, generates the session secret, serves it over HTTPS and redeploys on every push to `main`.
+
+- The demo database is created automatically on first start (`AUTO_SEED=1`); the free plan's disk is temporary, so data resets on redeploy or restart.
+- Each browser session may send `CHAT_LIMIT_PER_HOUR` (default 40) chat messages, so a public link cannot exhaust the LLM quota; the calendar is unaffected.
+- Free instances sleep after 15 minutes idle; the first request after that takes about a minute.
+
 ## Project structure
 
 ```

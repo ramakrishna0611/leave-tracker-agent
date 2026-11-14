@@ -5,6 +5,7 @@ Run:  uvicorn leave_tracker.api:app --reload      then open http://127.0.0.1:800
 import calendar as cal
 import os
 import secrets
+import time
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -29,9 +30,20 @@ engine = create_engine(DB_URL, connect_args={"check_same_thread": False} if DB_U
 Base.metadata.create_all(engine)
 SessionLocal = sessionmaker(engine, expire_on_commit=False)
 
+# Hosted demos start with an empty disk: create the demo companies on first start
+if os.getenv("AUTO_SEED", "1") == "1":
+    with SessionLocal() as _db:
+        if _db.query(Organization).count() == 0:
+            from leave_tracker.seed import seed
+            seed(_db)
+
+# Public demo protection: each browser session may send this many chat messages per hour
+CHAT_LIMIT_PER_HOUR = int(os.getenv("CHAT_LIMIT_PER_HOUR", "40"))
+CHAT_LOG: dict[str, list[float]] = {}
+
 app = FastAPI(title="Leave Tracker Agent")
 app.add_middleware(SessionMiddleware, secret_key=os.getenv("SECRET_KEY") or secrets.token_hex(32),
-                   same_site="lax", https_only=False, max_age=8 * 3600)
+                   same_site="lax", https_only=os.getenv("HTTPS_ONLY", "0") == "1", max_age=8 * 3600)
 
 AGENTS: dict[str, LeaveAgent] = {}        # one conversation per browser session (in memory)
 
@@ -303,6 +315,11 @@ def _agent(request: Request, svc: LeaveService) -> LeaveAgent:
 
 @app.post("/api/chat")
 def chat(body: ChatIn, request: Request, svc: LeaveService = Depends(service)):
+    now = time.time()
+    recent = [t for t in CHAT_LOG.get(request.session.get("sid", ""), []) if now - t < 3600]
+    if len(recent) >= CHAT_LIMIT_PER_HOUR:
+        raise HTTPException(429, "Demo limit reached for this hour. The calendar and team board still work.")
+    CHAT_LOG[request.session.get("sid", "")] = recent + [now]
     agent = _agent(request, svc)
     try:
         reply = agent.chat(body.message)
