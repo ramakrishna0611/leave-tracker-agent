@@ -11,14 +11,15 @@ import json
 import re
 from datetime import date, timedelta
 
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
 
-from leave_tracker.config import GROQ_API_KEY, LEAVE_TYPES, LLM_BASE_URL, LLM_MODEL
+from leave_tracker.config import FALLBACK_MODEL, GROQ_API_KEY, LEAVE_TYPES, LLM_BASE_URL, LLM_MODEL
 from leave_tracker.models import Holiday, Organization
 from leave_tracker.policy import lookup as policy_lookup
 from leave_tracker.service import LeaveService, PermissionDenied, fmt
 
 MAX_TOOL_ROUNDS = 6
+MAX_HISTORY = 16        # recent messages sent to the model (keeps each call well under the token-per-minute limit)
 YES = re.compile(r"^\s*(yes|y|yeah|yep|confirm|confirmed|ok|okay|sure|go ahead|book it|do it|proceed)\b[\s.!]*",
                  re.IGNORECASE)
 
@@ -71,7 +72,7 @@ class LeaveAgent:
     def __init__(self, service: LeaveService, client: OpenAI | None = None, model: str = LLM_MODEL):
         self.svc = service
         self.model = model
-        self.client = client or OpenAI(api_key=GROQ_API_KEY, base_url=LLM_BASE_URL, max_retries=6,
+        self.client = client or OpenAI(api_key=GROQ_API_KEY, base_url=LLM_BASE_URL, max_retries=2,
                                        default_headers={"User-Agent": "leave-tracker-agent"})
         self.pending: dict | None = None             # the one proposed write action awaiting confirmation
         self.last_user_message = ""
@@ -220,16 +221,47 @@ Keep replies short and friendly. Copy dates and weekdays exactly as the tools re
         return {"ok": r.ok, "result": r.message}
 
     # ---------- conversation ----------
+    def _trimmed(self) -> list[dict]:
+        """System prompt + the most recent turns, cut at a user message so tool calls stay paired."""
+        history = self.messages[1:]
+        if len(history) <= MAX_HISTORY:
+            return self.messages
+        tail = history[-MAX_HISTORY:]
+        first_user = next((i for i, m in enumerate(tail) if m["role"] == "user"), 0)
+        return [self.messages[0]] + tail[first_user:]
+
+    def _last_tool_message(self) -> str:
+        """Models sometimes end with an empty reply after a tool call; fall back to what the tool reported."""
+        for m in reversed(self.messages):
+            if m["role"] == "user":
+                break
+            if m["role"] == "tool":
+                data = json.loads(m["content"])
+                text = data.get("result") or data.get("problem") or data.get("permission_denied")
+                if text:
+                    return text
+        return "Done. Anything else?"
+
+    def _complete(self):
+        """Call the main model; if it is rate-limited, retry once on the fallback model (separate quota)."""
+        kwargs = dict(messages=self._trimmed(), tools=TOOLS, temperature=0.2, timeout=60, reasoning_effort="low")
+        try:
+            return self.client.chat.completions.create(model=self.model, **kwargs)
+        except RateLimitError:
+            if not FALLBACK_MODEL or FALLBACK_MODEL == self.model:
+                raise
+            return self.client.chat.completions.create(model=FALLBACK_MODEL, **kwargs)
+
     def chat(self, user_message: str) -> str:
         self.last_user_message = user_message
         self.messages.append({"role": "user", "content": user_message})
         for _ in range(MAX_TOOL_ROUNDS):
-            resp = self.client.chat.completions.create(model=self.model, messages=self.messages, tools=TOOLS,
-                                                       temperature=0.2, timeout=60)
+            resp = self._complete()
             msg = resp.choices[0].message
             if not msg.tool_calls:
-                self.messages.append({"role": "assistant", "content": msg.content or ""})
-                return msg.content or ""
+                text = (msg.content or "").strip() or self._last_tool_message()
+                self.messages.append({"role": "assistant", "content": text})
+                return text
             self.messages.append({"role": "assistant", "content": msg.content or "",
                                   "tool_calls": [tc.model_dump() for tc in msg.tool_calls]})
             for tc in msg.tool_calls:

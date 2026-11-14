@@ -66,3 +66,10 @@ def test_system_prompt_has_calendar_and_role(svc):
     a = agent_for(svc, "meera@acme.test")
     prompt = a.messages[0]["content"]
     assert "Business Analyst" in prompt and TODAY.isoformat() in prompt and "Christmas" in prompt
+
+
+def test_empty_model_reply_falls_back_to_tool_result(svc):
+    a = agent_for(svc, "kiran@acme.test")
+    a.messages += [{"role": "user", "content": "yes"},
+                   {"role": "tool", "tool_call_id": "x", "content": '{"ok": true, "result": "Leave requested."}'}]
+    assert a._last_tool_message() == "Leave requested."

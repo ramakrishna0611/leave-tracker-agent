@@ -16,6 +16,8 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from starlette.middleware.sessions import SessionMiddleware
 
+from openai import RateLimitError
+
 from leave_tracker.agent import LeaveAgent
 from leave_tracker.auth import AuthError, login_organization, login_user
 from leave_tracker.config import DB_URL, LEAVE_TYPES
@@ -303,7 +305,11 @@ def chat(body: ChatIn, request: Request, svc: LeaveService = Depends(service)):
     agent = _agent(request, svc)
     try:
         reply = agent.chat(body.message)
-    except Exception as e:                   # LLM outage or rate limit: tell the user instead of a 500
+    except RateLimitError:
+        agent.messages.pop() if agent.messages[-1]["role"] == "user" else None   # let the user simply resend
+        raise HTTPException(429, "The assistant is busy (free-tier limit of the AI model). Please try again in "
+                                 "about 30 seconds — the calendar works meanwhile.")
+    except Exception as e:                   # LLM outage: tell the user instead of a 500
         raise HTTPException(503, f"The assistant is unavailable right now ({type(e).__name__}). "
                                  "You can still apply from the calendar.")
     return {"reply": reply, "pending": agent.pending_summary()}
