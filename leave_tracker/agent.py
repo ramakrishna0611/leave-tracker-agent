@@ -50,7 +50,8 @@ TOOLS = [
     _tool("suggest_dates", "Nearest free window of N working days on or after a date for the user.",
           {"days": {"type": "integer"}, "after": DATE}, ["days", "after"]),
     _tool("my_leaves", "The user's own leave requests with ids and statuses."),
-    _tool("pending_approvals", "Leave requests waiting for the user's decision (PM or acting PM)."),
+    _tool("pending_approvals", "Leave requests waiting for the user's decision (PM, acting PM, or a BA for days they "
+                               "cover for the PM)."),
     _tool("propose_leave", "Prepare a leave booking for the user to confirm. Call only after check_leave passed and "
                            "the user has given a reason. Nothing is saved until the user says yes.",
           {"leave_type": {"type": "string", "enum": list(LEAVE_TYPES)}, "start_date": DATE, "end_date": DATE,

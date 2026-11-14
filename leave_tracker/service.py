@@ -131,19 +131,37 @@ class LeaveService:
             return False
         return self.user.role == "PM" or self.is_acting_pm(project_id)
 
-    def _approver_for(self, requester: User) -> User | None:
-        """The PM approves; if the PM is away today, the covering BA does."""
+    def _pm_cover(self, project_id: int | None, start: date, end: date) -> CoverAssignment | None:
+        """Active cover for the project's PM that overlaps [start, end] (the PM is out on some of those days)."""
+        pm = next((m for m in self._project_members(project_id) if m.role == "PM"), None)
+        if pm is None:
+            return None
+        return self.db.scalar(select(CoverAssignment).where(
+            CoverAssignment.org_id == self.org_id, CoverAssignment.pm_id == pm.id,
+            CoverAssignment.active.is_(True), CoverAssignment.start_date <= end,
+            CoverAssignment.end_date >= start))
+
+    def _approver_for(self, requester: User, start: date, end: date) -> User | None:
+        """The PM approves. If the PM is away today OR on any of the requested days,
+        the request goes to the BA who covers for the PM."""
         members = self._project_members(requester.project_id)
         pm = next((m for m in members if m.role == "PM"), None)
         if pm is None:
             return None
-        cover = self.db.scalar(select(CoverAssignment).where(
-            CoverAssignment.org_id == self.org_id, CoverAssignment.pm_id == pm.id,
-            CoverAssignment.active.is_(True), CoverAssignment.start_date <= self.today,
-            CoverAssignment.end_date >= self.today))
+        cover = self._pm_cover(requester.project_id, self.today, self.today) or             self._pm_cover(requester.project_id, start, end)
         if cover and cover.ba_id != requester.id:
             return self._get_user(cover.ba_id)
         return pm
+
+    def can_decide(self, lv: LeaveRequest) -> bool:
+        """PM of the project, the BA acting as PM today, or the BA covering the PM on the requested days."""
+        requester = self._get_user(lv.user_id)
+        if requester.id == self.user.id or requester.project_id != self.user.project_id:
+            return False
+        if self.can_manage(requester.project_id):
+            return True
+        cover = self._pm_cover(requester.project_id, lv.start_date, lv.end_date)
+        return self.user.role == "BA" and cover is not None and cover.ba_id == self.user.id
 
     # ---------- reading ----------
     def find_member(self, name: str) -> User:
@@ -200,12 +218,15 @@ class LeaveService:
             .order_by(LeaveRequest.start_date.desc())))
 
     def pending_approvals(self) -> list[LeaveRequest]:
-        if not self.can_manage(self.user.project_id):
+        """Requests this user may decide now: all of the team's for the PM / acting PM, and for a BA
+        the requests that fall on days they will cover for the PM."""
+        if self.user.role not in ("PM", "BA"):
             return []
         ids = [m.id for m in self._project_members(self.user.project_id) if m.id != self.user.id]
-        return list(self.db.scalars(select(LeaveRequest).where(
+        rows = self.db.scalars(select(LeaveRequest).where(
             LeaveRequest.org_id == self.org_id, LeaveRequest.user_id.in_(ids),
-            LeaveRequest.status == "PENDING").order_by(LeaveRequest.start_date)))
+            LeaveRequest.status == "PENDING").order_by(LeaveRequest.start_date))
+        return [lv for lv in rows if self.can_decide(lv)]
 
     # ---------- checking ----------
     def check_request(self, leave_type: str, start: date, end: date, exclude_id: int | None = None,
@@ -298,7 +319,7 @@ class LeaveService:
             message = f"Leave approved: {check.days} working day(s), {span(start, end)}." + \
                       (f" {ba.name} (BA) has been asked to cover." if ba else "")
         else:
-            approver = self._approver_for(self.user)
+            approver = self._approver_for(self.user, start, end)
             if approver:
                 self._notify(approver.id, "approval_needed",
                              f"{self.user.name} requested {check.days} day(s) of {leave_type} leave, "
@@ -315,8 +336,8 @@ class LeaveService:
         requester = self._get_user(lv.user_id)
         if requester.id == self.user.id:
             raise PermissionDenied("You cannot approve your own leave.")
-        if not self.can_manage(requester.project_id):
-            raise PermissionDenied("Only the project manager (or acting PM) of this project can decide.")
+        if not self.can_decide(lv):
+            raise PermissionDenied("Only the project manager, or the BA covering for them on these dates, can decide.")
         if lv.status != "PENDING":
             return RequestResult(ok=False, leave=lv, message=f"This request is already {lv.status.lower()}.")
         if approve:

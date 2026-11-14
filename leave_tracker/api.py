@@ -263,7 +263,8 @@ def dashboard(days: int = 21, svc: LeaveService = Depends(service)):
         for row in usage:
             row["no_leave_yet"] = row["total_used"] == 0 and row["total_pending"] == 0
         out["usage"] = usage
-        out["approvals"] = [_leave_row(lv) for lv in svc.pending_approvals()]
+    # A BA sees requests for the days they will cover for the PM, even before the cover starts
+    out["approvals"] = [_leave_row(lv) for lv in svc.pending_approvals()]
     return out
 
 

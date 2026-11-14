@@ -171,3 +171,25 @@ def test_audit_log_records_actions(svc, db):
     svc("anita@acme.test").decide(req.leave.id, approve=False, note="Release week")
     actions = [a.action for a in db.query(AuditLog).order_by(AuditLog.id)]
     assert actions == ["leave_requested", "leave_rejected"]
+
+
+def test_request_on_days_pm_is_away_goes_to_covering_ba(svc):
+    """PM is out 19-20 Nov (today is 16 Nov). A developer asking for 19 Nov is routed to the BA,
+    who can decide straight away; the PM, still in the office today, can decide too."""
+    assert svc("anita@acme.test").request_leave("earned", D(11, 19), D(11, 20), "Workshop").ok
+    req = svc("kiran@acme.test").request_leave("casual", D(11, 19), D(11, 19), "Family visit")
+    assert req.ok and "Meera Shah" in req.message
+    meera = svc("meera@acme.test")
+    assert req.leave.id in [lv.id for lv in meera.pending_approvals()]
+    assert not meera.is_acting_pm()                        # cover has not started yet...
+    assert meera.decide(req.leave.id, approve=True).ok     # ...but she covers those days, so she decides
+
+
+def test_request_outside_pm_absence_still_goes_to_pm(svc):
+    svc("anita@acme.test").request_leave("earned", D(11, 19), D(11, 20), "Workshop")
+    req = svc("kiran@acme.test").request_leave("casual", D(12, 2), D(12, 2), "Exam")
+    assert "Anita Rao" in req.message
+    meera = svc("meera@acme.test")
+    assert meera.pending_approvals() == []
+    with pytest.raises(PermissionDenied):
+        meera.decide(req.leave.id, approve=True)

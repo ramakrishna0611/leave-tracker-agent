@@ -395,9 +395,10 @@ async function loadBoard() {
     `<div class="cap"><span>${esc(c.date)} · ${esc(c.away.join(", "))} away</span><b>${c.percent}% capacity</b></div>`).join("");
 
   // approvals and usage (managers)
-  $("#approvals-block").hidden = !board.manager;
+  const canDecide = board.manager || board.approvals.length > 0;
+  $("#approvals-block").hidden = !canDecide;
   $("#usage-block").hidden = !board.manager;
-  if (board.manager) {
+  if (canDecide) {
     $("#approvals-count").textContent = board.approvals.length || "";
     $("#approvals-count").hidden = !board.approvals.length;
     $("#approvals").innerHTML = board.approvals.length ? board.approvals.map(a => `
@@ -407,6 +408,8 @@ async function loadBoard() {
         <button class="btn stamp" data-id="${a.id}" data-ok="1">Approve</button></div></div>`).join("")
       : '<p class="empty">Nothing waiting. Nice.</p>';
     $$("#approvals .btn").forEach(b => b.addEventListener("click", () => decide(b.dataset.id, b.dataset.ok === "1")));
+  }
+  if (board.manager) {
 
     const max = Math.max(...board.usage.map(u => u.total_used + u.total_pending + u.total_remaining), 1);
     $("#usage").innerHTML = board.usage.map(u => `
